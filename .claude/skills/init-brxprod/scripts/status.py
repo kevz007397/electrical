@@ -10,8 +10,16 @@ the agent) should make. Nothing here writes to the site or the project.
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
+
+
+def exe(name):
+    # Windows: npm installs CLIs as .cmd shims, which subprocess won't find by bare name.
+    return shutil.which(name) or name
+
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 sys.path.insert(0, os.path.join(ROOT, ".claude", "skills", "design-system", "scripts"))
@@ -58,9 +66,9 @@ return [
 
 
 def novamira(*args, payload=None):
-    cmd = ["novamira"] + list(args) + ["--json"]
+    cmd = [exe("novamira")] + list(args) + ["--json"]
     try:
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=120).stdout
+        out = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=120).stdout
         doc = json.loads(out)
     except (OSError, ValueError, subprocess.TimeoutExpired) as exc:
         return None, str(exc)
@@ -70,7 +78,7 @@ def novamira(*args, payload=None):
 
 
 def run_php(code):
-    path = os.path.join(os.environ.get("TMPDIR", "/tmp"), "brxprod-status-%d.json" % os.getpid())
+    path = os.path.join(tempfile.gettempdir(), "brxprod-status-%d.json" % os.getpid())
     with open(path, "w") as fh:
         json.dump({"code": code}, fh)
     try:
@@ -100,7 +108,7 @@ def main():
     else:
         add("FAIL", "Skills", "BRXProd skills not installed in this project", "run install-skills.sh")
     try:
-        plugins = subprocess.run(["claude", "plugin", "list"], capture_output=True, text=True, timeout=60).stdout
+        plugins = subprocess.run([exe("claude"), "plugin", "list"], capture_output=True, text=True, encoding="utf-8", timeout=60).stdout
     except (OSError, subprocess.TimeoutExpired):
         plugins = ""
     # Bricks' skills: a Claude Code plugin, or (Codex and other agents) the
